@@ -144,6 +144,22 @@ section{padding-block:96px}
 .lightbox img{max-height:86vh;max-width:min(92vw,760px);border-radius:12px}
 .lightbox button{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:calc(16px + env(safe-area-inset-right,0px))}
 
+/* review redirect pop-up */
+.review-modal{position:fixed;inset:0;z-index:90;background:rgba(12,14,30,.72);display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.review-modal[hidden]{display:none!important}
+.review-card{position:relative;width:min(100%,420px);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:20px;padding:28px 24px 24px;box-shadow:0 24px 48px -20px rgba(27,35,72,.45)}
+.review-card .eyebrow{margin:0 0 10px}
+.review-card h2{font-size:clamp(1.7rem,6vw,2.2rem);margin:0 0 12px}
+.review-card .review-body{margin:0 0 22px;color:var(--muted);font-size:1rem;line-height:1.55}
+.review-card .btn.primary{width:100%;justify-content:center;min-height:48px;text-align:center}
+.review-hint{margin:14px 0 0;font-size:.82rem;color:var(--muted);line-height:1.45}
+.review-hint[hidden]{display:none!important}
+.review-later{display:block;margin:16px auto 0;padding:0;border:0;background:none;color:var(--muted);font-family:var(--body);font-size:.9rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.review-later:hover{color:var(--rose)}
+.review-x{position:absolute;top:10px;right:10px;width:40px;height:40px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:1.5rem;line-height:1;cursor:pointer;font-family:var(--body)}
+.review-x:hover{color:var(--fg);background:var(--rose-soft)}
+body.review-open{overflow:hidden}
+
 /* reviews */
 .quote{display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:center}
 .big{font-family:var(--display);font-size:clamp(5rem,14vw,10rem);line-height:.8;color:var(--rose);font-weight:500}
@@ -298,6 +314,18 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 
 <div class="lightbox" id="lb" hidden><button class="btn small" id="lbx" style="background:#fff;color:#1b2348;border-color:#fff">Close</button><img id="lbimg" alt=""></div>
 
+<div class="review-modal" id="reviewModal" hidden>
+  <div class="review-card" role="dialog" aria-modal="true" aria-labelledby="reviewHeading">
+    <button type="button" class="review-x" id="reviewCloseX" aria-label="Close">×</button>
+    <p class="eyebrow">Thank you for visiting</p>
+    <h2 id="reviewHeading">Loved your new look? 💇‍♀️</h2>
+    <p class="review-body">A quick Google review helps us a lot. It takes less than a minute ⭐</p>
+    <a class="btn primary" id="reviewBtn" href="#">Write a review on Google</a>
+    <p class="review-hint" id="reviewHint" hidden></p>
+    <button type="button" class="review-later" id="reviewLater">Maybe later</button>
+  </div>
+</div>
+
 <script>
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -402,7 +430,64 @@ document.querySelectorAll('.tilt').forEach(f=>{
 const lb=document.getElementById('lb'),lbimg=document.getElementById('lbimg');
 document.querySelectorAll('[data-full]').forEach(b=>b.onclick=()=>{lbimg.src=b.dataset.full;lb.hidden=false});
 document.getElementById('lbx').onclick=()=>lb.hidden=true;lb.onclick=e=>{if(e.target===lb)lb.hidden=true};
-addEventListener('keydown',e=>{if(e.key==='Escape')lb.hidden=true});
+
+/* Google review pop-up (?review=…) */
+const GOOGLE_PLACE_ID="ChIJqz5jUfdRpjsRAdQ0BJmGpfw";
+const REVIEW_URL="https://search.google.com/local/writereview?placeid="+GOOGLE_PLACE_ID;
+const reviewModal=document.getElementById('reviewModal');
+const reviewBtn=document.getElementById('reviewBtn');
+const reviewHint=document.getElementById('reviewHint');
+const ua=navigator.userAgent||'';
+const isAndroid=/Android/i.test(ua);
+const isIOS=/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+
+function closeReviewModal(){
+  if(reviewModal.hidden)return;
+  reviewModal.hidden=true;
+  document.body.classList.remove('review-open');
+  const u=new URL(location.href);
+  u.searchParams.delete('review');
+  const q=u.searchParams.toString();
+  history.replaceState(null,'',u.pathname+(q?'?'+q:'')+u.hash);
+  document.body.setAttribute('tabindex','-1');
+  document.body.focus({preventScroll:true});
+}
+
+function openReviewModal(){
+  if(isAndroid){
+    reviewBtn.href='intent://search.google.com/local/writereview?placeid='+GOOGLE_PLACE_ID+'#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='+encodeURIComponent(REVIEW_URL)+';end';
+    reviewBtn.removeAttribute('target');
+    reviewBtn.removeAttribute('rel');
+    reviewHint.hidden=false;
+    reviewHint.textContent='Didn\'t open? Tap ⋮ at the top right and choose "Open in Chrome".';
+  }else{
+    reviewBtn.href=REVIEW_URL;
+    reviewBtn.target='_blank';
+    reviewBtn.rel='noopener';
+    if(isIOS){
+      reviewHint.hidden=false;
+      reviewHint.textContent='Didn\'t open? Tap the menu and choose "Open in Safari".';
+    }else{
+      reviewHint.hidden=true;
+      reviewHint.textContent='';
+    }
+  }
+  reviewModal.hidden=false;
+  document.body.classList.add('review-open');
+  reviewBtn.focus({preventScroll:true});
+}
+
+document.getElementById('reviewCloseX').onclick=closeReviewModal;
+document.getElementById('reviewLater').onclick=closeReviewModal;
+reviewModal.onclick=e=>{if(e.target===reviewModal)closeReviewModal()};
+
+addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(!reviewModal.hidden){closeReviewModal();return}
+  if(!lb.hidden)lb.hidden=true;
+});
+
+if(new URLSearchParams(location.search).has('review'))openReviewModal();
 
 /* copy */
 document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>{
