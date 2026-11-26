@@ -153,6 +153,7 @@ section{padding-block:96px}
 .review-card .review-body{margin:0 0 22px;color:var(--muted);font-size:1rem;line-height:1.55}
 .review-card .btn.primary{width:100%;justify-content:center;min-height:48px;text-align:center}
 .review-hint{margin:14px 0 0;font-size:.82rem;color:var(--muted);line-height:1.45}
+.review-hint a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .review-hint[hidden]{display:none!important}
 .review-later{display:block;margin:16px auto 0;padding:0;border:0;background:none;color:var(--muted);font-family:var(--body);font-size:.9rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .review-later:hover{color:var(--rose)}
@@ -434,12 +435,15 @@ document.getElementById('lbx').onclick=()=>lb.hidden=true;lb.onclick=e=>{if(e.ta
 /* Google review pop-up (?review=…) */
 const GOOGLE_PLACE_ID="ChIJqz5jUfdRpjsRAdQ0BJmGpfw";
 const REVIEW_URL="https://search.google.com/local/writereview?placeid="+GOOGLE_PLACE_ID;
+const IOS_CHROME_URL="googlechromes://search.google.com/local/writereview?placeid="+GOOGLE_PLACE_ID;
+const IOS_SAFARI_URL="x-safari-https://search.google.com/local/writereview?placeid="+GOOGLE_PLACE_ID;
 const reviewModal=document.getElementById('reviewModal');
 const reviewBtn=document.getElementById('reviewBtn');
 const reviewHint=document.getElementById('reviewHint');
 const ua=navigator.userAgent||'';
 const isAndroid=/Android/i.test(ua);
 const isIOS=/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+let iosOpening=false;
 
 function closeReviewModal(){
   if(reviewModal.hidden)return;
@@ -460,21 +464,44 @@ function openReviewModal(){
     reviewBtn.removeAttribute('rel');
     reviewHint.hidden=false;
     reviewHint.textContent='Didn\'t open? Tap ⋮ at the top right and choose "Open in Chrome".';
+  }else if(isIOS){
+    reviewBtn.href='#';
+    reviewBtn.removeAttribute('target');
+    reviewBtn.removeAttribute('rel');
+    reviewHint.hidden=false;
+    reviewHint.innerHTML='Didn\'t open? <a href="'+IOS_SAFARI_URL+'">Open in Safari</a> · <a href="'+REVIEW_URL+'">Continue here</a>';
   }else{
     reviewBtn.href=REVIEW_URL;
     reviewBtn.target='_blank';
     reviewBtn.rel='noopener';
-    if(isIOS){
-      reviewHint.hidden=false;
-      reviewHint.textContent='Didn\'t open? Tap the menu and choose "Open in Safari".';
-    }else{
-      reviewHint.hidden=true;
-      reviewHint.textContent='';
-    }
+    reviewHint.hidden=true;
+    reviewHint.textContent='';
   }
   reviewModal.hidden=false;
   document.body.classList.add('review-open');
   reviewBtn.focus({preventScroll:true});
+}
+
+if(isIOS){
+  reviewBtn.addEventListener('click',e=>{
+    e.preventDefault();
+    if(iosOpening)return;
+    iosOpening=true;
+    let left=false;
+    const markLeft=()=>{left=true};
+    const onVis=()=>{if(document.hidden)left=true};
+    document.addEventListener('visibilitychange',onVis);
+    addEventListener('pagehide',markLeft);
+    addEventListener('blur',markLeft);
+    location.href=IOS_CHROME_URL;
+    setTimeout(()=>{
+      document.removeEventListener('visibilitychange',onVis);
+      removeEventListener('pagehide',markLeft);
+      removeEventListener('blur',markLeft);
+      if(!left&&!document.hidden)location.href=IOS_SAFARI_URL;
+      iosOpening=false;
+    },2000);
+  });
 }
 
 document.getElementById('reviewCloseX').onclick=closeReviewModal;
